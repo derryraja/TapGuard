@@ -15,7 +15,7 @@ keyboard-surveillance behaviour, then reports what it finds in a clear GUI.
 
 ## Screenshot
 
-> _A scan screenshot / GIF goes here (`docs/screenshot.png`)._
+![TapGuard scanning for keyboard event taps on macOS](docs/screenshot.png)
 
 ## The threat it defends against
 
