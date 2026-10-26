@@ -18,6 +18,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QSplitter,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QTextBrowser,
@@ -32,6 +35,33 @@ from .widgets import ToggleSwitch
 from .worker import ScanJob
 
 COLUMNS = ["", "Severity", "Finding", "Process", "PID", "Detector"]
+
+
+class ColoredTextDelegate(QStyledItemDelegate):
+    """Paint a cell's text in a per-item colour (UserRole) that selection won't override.
+
+    With an active stylesheet, Qt repaints a selected item's text in the highlight
+    colour, ignoring the item's foreground brush. Drawing the text ourselves keeps
+    the severity / NEW colours correct whether or not the row is selected.
+    """
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        text = opt.text
+        opt.text = ""
+        widget = opt.widget
+        style = widget.style() if widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, widget)
+        if not text:
+            return
+        color = index.data(Qt.ItemDataRole.UserRole)
+        align = index.data(Qt.ItemDataRole.TextAlignmentRole) or (Qt.AlignLeft | Qt.AlignVCenter)
+        painter.save()
+        painter.setFont(opt.font)
+        painter.setPen(QColor(color) if color else QColor(TEXT))
+        painter.drawText(opt.rect.adjusted(10, 0, -6, 0), align, text)
+        painter.restore()
 
 
 class MainWindow(QMainWindow):
@@ -136,6 +166,9 @@ class MainWindow(QMainWindow):
         self.table.setColumnWidth(4, 68)
         head.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.table.itemSelectionChanged.connect(self._selection_changed)
+        self._colored_delegate = ColoredTextDelegate(self.table)
+        self.table.setItemDelegateForColumn(0, self._colored_delegate)
+        self.table.setItemDelegateForColumn(1, self._colored_delegate)
         splitter.addWidget(self.table)
 
         self.detail = QTextBrowser()
@@ -205,7 +238,7 @@ class MainWindow(QMainWindow):
             new_item = QTableWidgetItem("NEW" if is_new else "")
             new_item.setTextAlignment(Qt.AlignCenter)
             if is_new:
-                new_item.setForeground(QBrush(QColor(NEW_COLOR)))
+                new_item.setData(Qt.ItemDataRole.UserRole, NEW_COLOR)
                 font = new_item.font()
                 font.setBold(True)
                 font.setPointSizeF(max(font.pointSizeF() - 1.5, 8.0))
@@ -213,7 +246,7 @@ class MainWindow(QMainWindow):
             self.table.setItem(row, 0, new_item)
 
             sev_item = QTableWidgetItem("●  " + finding.severity.label)
-            sev_item.setForeground(QBrush(QColor(SEVERITY_COLORS[finding.severity.label])))
+            sev_item.setData(Qt.ItemDataRole.UserRole, SEVERITY_COLORS[finding.severity.label])
             self.table.setItem(row, 1, sev_item)
 
             self._set_text(row, 2, finding.title, bold=is_new)
